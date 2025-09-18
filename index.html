@@ -44,6 +44,16 @@
           <label for="type">Type d’achat</label>
           <input id="type" name="type" type="text" maxlength="120" placeholder="Supermarché, carburant, …" required>
         </div>
+        <div class="row">
+          <label for="rglt">Type de règlement</label>
+          <select id="rglt" name="rglt" required>
+            <option value="">-- Choisir --</option>
+            <option value="CB">CB</option>
+            <option value="Chq">Chèque</option>
+            <option value="Prlt">Prélèvement</option>
+            <option value="Retrait">Retrait</option>
+          </select>
+        </div>
         <button id="submit" class="btn" type="submit">Enregistrer</button>
       </form>
 
@@ -65,6 +75,7 @@
     const dateInput = $('#date');
     const montantInput = $('#montant');
     const typeInput = $('#type');
+    const rgltInput = $('#rglt');
     const msg = $('#msg');
     const totalVal = $('#totalVal');
     const submitBtn = $('#submit');
@@ -89,7 +100,7 @@
         const j = await r.json();
         if (j && j.ok) totalVal.textContent = formatEUR(Number(j.monthTotal||0));
         else totalVal.textContent = '—';
-      } catch (e) {
+      } catch {
         totalVal.textContent = '—';
       }
     }
@@ -102,8 +113,9 @@
       const date = dateInput.value.trim();
       const montant = montantInput.value.trim();
       const type = typeInput.value.trim();
+      const rglt = rgltInput.value.trim();
 
-      if (!date || !montant || !type) {
+      if (!date || !montant || !type || !rglt) {
         msg.textContent = 'Champs manquants.';
         msg.classList.add('err');
         return;
@@ -112,11 +124,11 @@
       submitBtn.disabled = true;
 
       try {
-        // FormData => pas de Content-Type explicite => pas de preflight CORS
         const fd = new FormData();
         fd.append('date', date);
         fd.append('montant', montant);
         fd.append('type', type);
+        fd.append('rglt', rglt);
 
         const r = await fetch(ENDPOINT, { method: 'POST', body: fd });
         const j = await r.json();
@@ -126,12 +138,13 @@
           msg.classList.add('ok');
           montantInput.value = '';
           typeInput.value = '';
+          rgltInput.value = '';
           await refreshTotal();
         } else {
           msg.textContent = j.error || 'Erreur à l’enregistrement.';
           msg.classList.add('err');
         }
-      } catch (err) {
+      } catch {
         msg.textContent = 'Erreur réseau ou autorisation.';
         msg.classList.add('err');
       } finally {
@@ -140,7 +153,7 @@
     }
 
     document.getElementById('f').addEventListener('submit', submitForm);
-    refreshTotal(); // charge le total au démarrage
+    refreshTotal();
   </script>
 </body>
 </html>
