@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Suivi Dépenses — Mois en cours</title>
+  <meta name="color-scheme" content="dark light">
   <style>
     :root { --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#f59e0b; --ok:#10b981; --err:#ef4444; --border:#1f2937; }
     * { box-sizing: border-box; }
@@ -30,7 +31,7 @@
   <div class="wrap">
     <div class="h1">Dépenses — mois en cours</div>
     <div class="card">
-      <form id="f">
+      <form id="f" autocomplete="off">
         <div class="row">
           <label for="date">Date</label>
           <input id="date" name="date" type="date" required>
@@ -57,7 +58,8 @@
   </div>
 
   <script>
-    const ENDPOINT = 'YOUR_WEB_APP_URL'; // ← Remplacez par l’URL du déploiement Apps Script
+    // URL Web App Apps Script
+    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyfcGG8eO8M68g2FHi-A6zXtC5Ye85BhtOJ0wzU0rTUTLfl57wxWZrLrFUr9T_pAMbkaw/exec';
 
     const $ = sel => document.querySelector(sel);
     const dateInput = $('#date');
@@ -77,22 +79,16 @@
     })();
 
     function formatEUR(v){
-      try {
-        return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR' }).format(v);
-      } catch (_) {
-        return (Math.round(v*100)/100).toFixed(2) + ' €';
-      }
+      try { return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR' }).format(v); }
+      catch { return (Math.round(Number(v||0)*100)/100).toFixed(2) + ' €'; }
     }
 
     async function refreshTotal(){
       try {
         const r = await fetch(`${ENDPOINT}?monthTotal=1`, { method:'GET' });
         const j = await r.json();
-        if (j && j.ok) {
-          totalVal.textContent = formatEUR(Number(j.monthTotal||0));
-        } else {
-          totalVal.textContent = '—';
-        }
+        if (j && j.ok) totalVal.textContent = formatEUR(Number(j.monthTotal||0));
+        else totalVal.textContent = '—';
       } catch (e) {
         totalVal.textContent = '—';
       }
@@ -103,7 +99,6 @@
       msg.textContent = '';
       msg.className = 'msg';
 
-      // validations simples
       const date = dateInput.value.trim();
       const montant = montantInput.value.trim();
       const type = typeInput.value.trim();
@@ -117,12 +112,15 @@
       submitBtn.disabled = true;
 
       try {
-        const r = await fetch(ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json' },
-          body: JSON.stringify({ date, montant, type })
-        });
+        // FormData => pas de Content-Type explicite => pas de preflight CORS
+        const fd = new FormData();
+        fd.append('date', date);
+        fd.append('montant', montant);
+        fd.append('type', type);
+
+        const r = await fetch(ENDPOINT, { method: 'POST', body: fd });
         const j = await r.json();
+
         if (j.ok) {
           msg.textContent = 'Enregistré.';
           msg.classList.add('ok');
