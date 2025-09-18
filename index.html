@@ -18,7 +18,7 @@
     input:focus, select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(245,158,11,.15); }
     .btn { width:100%; padding:14px; border:none; border-radius:12px; background:var(--accent); color:#111; font-weight:700; cursor:pointer; }
     .btn:disabled { opacity:.6; cursor:not-allowed; }
-    .tot { margin-top:12px; padding:12px; border-radius:12px; background:#0b1220; border:1px dashed var(--border); display:flex; justify-content:space-between; align-items:center; }
+    .tot { margin-top:12px; padding:12px; border-radius:12px; background:#0b1220; border:1px dashed var(--border); display:flex; flex-direction:column; gap:8px; }
     .tot .label { color:var(--muted); font-size:13px; }
     .tot .val { font-size:20px; font-weight:800; }
     .msg { margin-top:10px; font-size:14px; }
@@ -29,7 +29,7 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="h1">Dépenses — mois en cours</div>
+    <div class="h1">Dépenses</div>
     <div class="card">
       <form id="f" autocomplete="off">
         <div class="row">
@@ -58,17 +58,22 @@
       </form>
 
       <div class="tot" id="totalBox" aria-live="polite">
-        <div class="label">Total du mois en cours</div>
+        <div>
+          <label for="monthSel">Mois</label>
+          <select id="monthSel"></select>
+          <label for="yearSel">Année</label>
+          <select id="yearSel"></select>
+        </div>
+        <div class="label">Total du mois sélectionné</div>
         <div class="val" id="totalVal">—</div>
       </div>
 
       <div class="msg" id="msg"></div>
-      <div class="fine">Le total repart à zéro automatiquement à chaque nouveau mois (les données restent dans le tableur).</div>
+      <div class="fine">Le total repart à zéro automatiquement pour chaque mois.</div>
     </div>
   </div>
 
   <script>
-    // URL Web App Apps Script
     const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyfcGG8eO8M68g2FHi-A6zXtC5Ye85BhtOJ0wzU0rTUTLfl57wxWZrLrFUr9T_pAMbkaw/exec';
 
     const $ = sel => document.querySelector(sel);
@@ -79,15 +84,27 @@
     const msg = $('#msg');
     const totalVal = $('#totalVal');
     const submitBtn = $('#submit');
+    const monthSel = $('#monthSel');
+    const yearSel = $('#yearSel');
 
-    // Date par défaut = aujourd’hui
-    (function setToday(){
-      const d = new Date();
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const dd = String(d.getDate()).padStart(2,'0');
-      dateInput.value = `${yyyy}-${mm}-${dd}`;
-    })();
+    // Remplir sélecteurs mois + année
+    const months = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+    const now = new Date();
+    for (let i=1;i<=12;i++){
+      const opt=document.createElement('option');
+      opt.value=i;
+      opt.textContent=months[i-1];
+      if(i===now.getMonth()+1) opt.selected=true;
+      monthSel.appendChild(opt);
+    }
+    const thisYear=now.getFullYear();
+    for(let y=thisYear-2;y<=thisYear+1;y++){
+      const opt=document.createElement('option');
+      opt.value=y;
+      opt.textContent=y;
+      if(y===thisYear) opt.selected=true;
+      yearSel.appendChild(opt);
+    }
 
     function formatEUR(v){
       try { return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'EUR' }).format(v); }
@@ -95,64 +112,65 @@
     }
 
     async function refreshTotal(){
+      const m=monthSel.value, y=yearSel.value;
       try {
-        const r = await fetch(`${ENDPOINT}?monthTotal=1`, { method:'GET' });
-        const j = await r.json();
-        if (j && j.ok) totalVal.textContent = formatEUR(Number(j.monthTotal||0));
-        else totalVal.textContent = '—';
-      } catch {
-        totalVal.textContent = '—';
-      }
+        const r=await fetch(`${ENDPOINT}?month=${m}&year=${y}`);
+        const j=await r.json();
+        if(j && j.ok) totalVal.textContent=formatEUR(j.monthTotal||0);
+        else totalVal.textContent='—';
+      }catch{ totalVal.textContent='—'; }
     }
 
     async function submitForm(e){
       e.preventDefault();
-      msg.textContent = '';
-      msg.className = 'msg';
+      msg.textContent='';
+      msg.className='msg';
 
-      const date = dateInput.value.trim();
-      const montant = montantInput.value.trim();
-      const type = typeInput.value.trim();
-      const rglt = rgltInput.value.trim();
+      const date=dateInput.value.trim();
+      const montant=montantInput.value.trim();
+      const type=typeInput.value.trim();
+      const rglt=rgltInput.value.trim();
 
-      if (!date || !montant || !type || !rglt) {
-        msg.textContent = 'Champs manquants.';
+      if(!date||!montant||!type||!rglt){
+        msg.textContent='Champs manquants.';
         msg.classList.add('err');
         return;
       }
 
-      submitBtn.disabled = true;
+      submitBtn.disabled=true;
 
-      try {
-        const fd = new FormData();
-        fd.append('date', date);
-        fd.append('montant', montant);
-        fd.append('type', type);
-        fd.append('rglt', rglt);
+      try{
+        const fd=new FormData();
+        fd.append('date',date);
+        fd.append('montant',montant);
+        fd.append('type',type);
+        fd.append('rglt',rglt);
 
-        const r = await fetch(ENDPOINT, { method: 'POST', body: fd });
-        const j = await r.json();
+        const r=await fetch(ENDPOINT,{method:'POST',body:fd});
+        const j=await r.json();
 
-        if (j.ok) {
-          msg.textContent = 'Enregistré.';
+        if(j.ok){
+          msg.textContent='Enregistré.';
           msg.classList.add('ok');
-          montantInput.value = '';
-          typeInput.value = '';
-          rgltInput.value = '';
+          montantInput.value='';
+          typeInput.value='';
+          rgltInput.value='';
           await refreshTotal();
-        } else {
-          msg.textContent = j.error || 'Erreur à l’enregistrement.';
+        }else{
+          msg.textContent=j.error||'Erreur à l’enregistrement.';
           msg.classList.add('err');
         }
-      } catch {
-        msg.textContent = 'Erreur réseau ou autorisation.';
+      }catch{
+        msg.textContent='Erreur réseau ou autorisation.';
         msg.classList.add('err');
-      } finally {
-        submitBtn.disabled = false;
+      }finally{
+        submitBtn.disabled=false;
       }
     }
 
     document.getElementById('f').addEventListener('submit', submitForm);
+    monthSel.addEventListener('change', refreshTotal);
+    yearSel.addEventListener('change', refreshTotal);
     refreshTotal();
   </script>
 </body>
